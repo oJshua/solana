@@ -16,6 +16,7 @@ use jsonrpc_http_server::{
     RequestMiddlewareAction, ServerBuilder,
 };
 use regex::Regex;
+use solana_client::rpc_cache::ProgramAccountsCache;
 use solana_ledger::blockstore::Blockstore;
 use solana_metrics::inc_new_counter_info;
 use solana_runtime::{
@@ -282,6 +283,8 @@ impl JsonRpcService {
             override_health_check,
         ));
 
+        let program_accounts_cache = Arc::new(RwLock::new(ProgramAccountsCache::new(1000)));
+
         let tpu_address = cluster_info.my_contact_info().tpu;
         let mut runtime = runtime::Builder::new()
             .threaded_scheduler()
@@ -341,6 +344,7 @@ impl JsonRpcService {
             &runtime,
             bigtable_ledger_storage,
             optimistically_confirmed_bank,
+            program_accounts_cache,
         );
 
         let leader_info =

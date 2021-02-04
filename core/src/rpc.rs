@@ -21,6 +21,7 @@ use solana_account_decoder::{
     UiAccount, UiAccountData, UiAccountEncoding, UiDataSliceConfig,
 };
 use solana_client::{
+    rpc_cache::{ProgramAccountsCache, ProgramAccountsCacheKey},
     rpc_config::*,
     rpc_custom_error::RpcCustomError,
     rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType},
@@ -136,6 +137,7 @@ pub struct JsonRpcRequestProcessor {
     runtime_handle: runtime::Handle,
     bigtable_ledger_storage: Option<solana_storage_bigtable::LedgerStorage>,
     optimistically_confirmed_bank: Arc<RwLock<OptimisticallyConfirmedBank>>,
+    program_accounts_cache: Arc<RwLock<ProgramAccountsCache>>,
 }
 impl Metadata for JsonRpcRequestProcessor {}
 
@@ -218,6 +220,7 @@ impl JsonRpcRequestProcessor {
         runtime: &runtime::Runtime,
         bigtable_ledger_storage: Option<solana_storage_bigtable::LedgerStorage>,
         optimistically_confirmed_bank: Arc<RwLock<OptimisticallyConfirmedBank>>,
+        program_accounts_cache: Arc<RwLock<ProgramAccountsCache>>,
     ) -> (Self, Receiver<TransactionInfo>) {
         let (sender, receiver) = channel();
         (
@@ -235,6 +238,7 @@ impl JsonRpcRequestProcessor {
                 runtime_handle: runtime.handle().clone(),
                 bigtable_ledger_storage,
                 optimistically_confirmed_bank,
+                program_accounts_cache,
             },
             receiver,
         )
@@ -274,6 +278,7 @@ impl JsonRpcRequestProcessor {
             optimistically_confirmed_bank: Arc::new(RwLock::new(OptimisticallyConfirmedBank {
                 bank: bank.clone(),
             })),
+            program_accounts_cache: Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         }
     }
 
@@ -358,6 +363,10 @@ impl JsonRpcRequestProcessor {
             };
         Ok(result)
     }
+
+    // pub fn get_cached_program_accounts() -> Option<> {
+
+    // }
 
     pub fn get_inflation_governor(
         &self,
@@ -2152,7 +2161,25 @@ impl RpcSol for RpcSolImpl {
             "get_program_accounts rpc request received: {:?}",
             program_id_str
         );
-        let program_id = verify_pubkey(program_id_str)?;
+
+        let program_id = verify_pubkey(program_id_str.clone())?;
+
+        let cache_key = ProgramAccountsCacheKey {
+            program_id: program_id_str.clone(),
+            config: config.clone(),
+        };
+
+        let program_accounts_cache = meta.program_accounts_cache.read().unwrap();
+        let results = program_accounts_cache.get(&cache_key);
+        drop(program_accounts_cache);
+
+        if let Some(accounts) = results {
+            info!("INFO: From cache");
+            return Ok(accounts);
+        }
+
+        info!("INFO: No cache");
+
         let (config, filters) = if let Some(config) = config {
             (
                 Some(config.account_config),
@@ -2164,7 +2191,19 @@ impl RpcSol for RpcSolImpl {
         for filter in &filters {
             verify_filter(filter)?;
         }
-        meta.get_program_accounts(&program_id, config, filters)
+
+        let accts = meta
+            .get_program_accounts(&program_id, config, filters)
+            .unwrap();
+        let mut program_accounts_cache = meta.program_accounts_cache.write().unwrap();
+
+        program_accounts_cache.put(
+            &cache_key,
+            &accts,
+        );
+        drop(program_accounts_cache);
+
+        Ok(accts)
     }
 
     fn get_inflation_governor(
@@ -3157,6 +3196,7 @@ pub mod tests {
             &runtime::Runtime::new().unwrap(),
             None,
             OptimisticallyConfirmedBank::locked_from_bank_forks_root(&bank_forks),
+            Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         );
         SendTransactionService::new(tpu_address, &bank_forks, None, receiver, 1000, 1);
 
@@ -4558,6 +4598,7 @@ pub mod tests {
             &runtime::Runtime::new().unwrap(),
             None,
             OptimisticallyConfirmedBank::locked_from_bank_forks_root(&bank_forks),
+            Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         );
         SendTransactionService::new(tpu_address, &bank_forks, None, receiver, 1000, 1);
 
@@ -4754,6 +4795,7 @@ pub mod tests {
             &runtime::Runtime::new().unwrap(),
             None,
             OptimisticallyConfirmedBank::locked_from_bank_forks_root(&bank_forks),
+            Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         );
         SendTransactionService::new(tpu_address, &bank_forks, None, receiver, 1000, 1);
         assert_eq!(request_processor.validator_exit(), false);
@@ -4787,6 +4829,7 @@ pub mod tests {
             &runtime::Runtime::new().unwrap(),
             None,
             OptimisticallyConfirmedBank::locked_from_bank_forks_root(&bank_forks),
+            Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         );
         SendTransactionService::new(tpu_address, &bank_forks, None, receiver, 1000, 1);
         assert_eq!(request_processor.validator_exit(), true);
@@ -4879,6 +4922,7 @@ pub mod tests {
             &runtime::Runtime::new().unwrap(),
             None,
             OptimisticallyConfirmedBank::locked_from_bank_forks_root(&bank_forks),
+            Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         );
         SendTransactionService::new(tpu_address, &bank_forks, None, receiver, 1000, 1);
         assert_eq!(
@@ -6108,6 +6152,7 @@ pub mod tests {
             &runtime::Runtime::new().unwrap(),
             None,
             optimistically_confirmed_bank.clone(),
+            Arc::new(RwLock::new(ProgramAccountsCache::new(1000))),
         );
 
         let mut io = MetaIoHandler::default();

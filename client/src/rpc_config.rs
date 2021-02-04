@@ -54,7 +54,7 @@ pub struct RpcStakeConfig {
     pub commitment: Option<CommitmentConfig>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcAccountInfoConfig {
     pub encoding: Option<UiAccountEncoding>,
@@ -63,7 +63,7 @@ pub struct RpcAccountInfoConfig {
     pub commitment: Option<CommitmentConfig>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcProgramAccountsConfig {
     pub filters: Option<Vec<RpcFilterType>>,
