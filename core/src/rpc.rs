@@ -2179,9 +2179,7 @@ impl RpcSol for RpcSolImpl {
             "get_program_accounts rpc request received: {:?}",
             program_id_str
         );
-
         let program_id = verify_pubkey(program_id_str.clone())?;
-
         let (account_info_config, filters) = if let Some(config) = config.clone() {
             (
                 Some(config.account_config),
@@ -2190,20 +2188,19 @@ impl RpcSol for RpcSolImpl {
         } else {
             (None, vec![])
         };
-
         for filter in &filters {
             verify_filter(filter)?;
         }
 
         if let Some(accounts) = meta.get_cached_program_accounts(&program_id_str, &config) {
-            return Ok(accounts);
+            Ok(accounts)
+        } else {
+            meta.get_program_accounts(&program_id, account_info_config, filters)
+                .map(|accounts| {
+                    meta.cache_program_accounts(&program_id_str, &config, &accounts);
+                    accounts
+                })
         }
-
-        meta.get_program_accounts(&program_id, account_info_config, filters)
-            .map(|accounts| {
-                meta.cache_program_accounts(&program_id_str, &config, &accounts);
-                accounts
-            })
     }
 
     fn get_inflation_governor(
