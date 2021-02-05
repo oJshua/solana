@@ -35,6 +35,9 @@ use std::{
 };
 use tokio::runtime;
 
+const PROGRAM_ACCOUNTS_CACHE_SIZE: usize = 1000;
+const PROGRAM_ACCOUNTS_CACHE_DURATION: u64 = 30;
+
 pub struct JsonRpcService {
     thread_hdl: JoinHandle<()>,
 
@@ -283,7 +286,10 @@ impl JsonRpcService {
             override_health_check,
         ));
 
-        let program_accounts_cache = Arc::new(RwLock::new(ProgramAccountsCache::new(1000)));
+        let program_accounts_cache = Arc::new(RwLock::new(ProgramAccountsCache::new(
+            PROGRAM_ACCOUNTS_CACHE_SIZE,
+            PROGRAM_ACCOUNTS_CACHE_DURATION,
+        )));
 
         let tpu_address = cluster_info.my_contact_info().tpu;
         let mut runtime = runtime::Builder::new()
