@@ -96,7 +96,7 @@ fn test_cache_stays_within_size_limit() {
 
     let config = Some(RpcProgramAccountsConfig {
         filters: None,
-        account_config: RpcAccountInfoConfig {
+        account_config: crate::rpc_config::RpcAccountInfoConfig {
             encoding: None,
             data_slice: None,
             commitment: None,
@@ -130,7 +130,7 @@ fn test_old_entries_get_evicted() {
 
     let config = Some(RpcProgramAccountsConfig {
         filters: None,
-        account_config: RpcAccountInfoConfig {
+        account_config: crate::rpc_config::RpcAccountInfoConfig {
             encoding: None,
             data_slice: None,
             commitment: None,
@@ -149,7 +149,7 @@ fn test_old_entries_get_evicted() {
         &config,
         &accounts,
     );
-    sleep(Duration::from_secs(1));
+    std::thread::sleep(Duration::from_secs(1));
     cache.cache_program_accounts(
         &String::from("He6B2t1kftPjPvMro9e73Vi24rQx2cJry82igBrNhn83"),
         &config,
@@ -164,7 +164,7 @@ fn test_entries_hashed_the_same() {
 
     let config = Some(RpcProgramAccountsConfig {
         filters: None,
-        account_config: RpcAccountInfoConfig {
+        account_config: crate::rpc_config::RpcAccountInfoConfig {
             encoding: None,
             data_slice: None,
             commitment: None,
